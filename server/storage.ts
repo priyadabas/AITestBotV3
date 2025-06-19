@@ -15,6 +15,8 @@ import {
   type BotExecution,
   type InsertBotExecution,
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Projects
@@ -42,6 +44,131 @@ export interface IStorage {
   createBotExecution(execution: InsertBotExecution): Promise<BotExecution>;
   getBotExecutionsByProject(projectId: number): Promise<BotExecution[]>;
   updateBotExecution(id: number, updates: Partial<BotExecution>): Promise<BotExecution>;
+}
+
+export class DatabaseStorage implements IStorage {
+  // Projects
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const [project] = await db
+      .insert(projects)
+      .values(insertProject)
+      .returning();
+    return project;
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project || undefined;
+  }
+
+  async getAllProjects(): Promise<Project[]> {
+    return await db.select().from(projects);
+  }
+
+  async updateProject(id: number, updates: Partial<Project>): Promise<Project> {
+    const [project] = await db
+      .update(projects)
+      .set(updates)
+      .where(eq(projects.id, id))
+      .returning();
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    return project;
+  }
+
+  // Uploads
+  async createUpload(insertUpload: InsertUpload): Promise<Upload> {
+    const [upload] = await db
+      .insert(uploads)
+      .values(insertUpload)
+      .returning();
+    return upload;
+  }
+
+  async getUploadsByProject(projectId: number): Promise<Upload[]> {
+    return await db.select().from(uploads).where(eq(uploads.projectId, projectId));
+  }
+
+  async getUpload(id: number): Promise<Upload | undefined> {
+    const [upload] = await db.select().from(uploads).where(eq(uploads.id, id));
+    return upload || undefined;
+  }
+
+  // Analysis Results
+  async createAnalysisResult(insertResult: InsertAnalysisResult): Promise<AnalysisResult> {
+    const [result] = await db
+      .insert(analysisResults)
+      .values(insertResult)
+      .returning();
+    return result;
+  }
+
+  async getAnalysisResultsByProject(projectId: number): Promise<AnalysisResult[]> {
+    return await db.select().from(analysisResults).where(eq(analysisResults.projectId, projectId));
+  }
+
+  async updateAnalysisResult(id: number, updates: Partial<AnalysisResult>): Promise<AnalysisResult> {
+    const [result] = await db
+      .update(analysisResults)
+      .set(updates)
+      .where(eq(analysisResults.id, id))
+      .returning();
+    if (!result) {
+      throw new Error("Analysis result not found");
+    }
+    return result;
+  }
+
+  // Test Scenarios
+  async createTestScenario(insertScenario: InsertTestScenario): Promise<TestScenario> {
+    const [scenario] = await db
+      .insert(testScenarios)
+      .values(insertScenario)
+      .returning();
+    return scenario;
+  }
+
+  async getTestScenariosByProject(projectId: number): Promise<TestScenario[]> {
+    return await db.select().from(testScenarios).where(eq(testScenarios.projectId, projectId));
+  }
+
+  async updateTestScenario(id: number, updates: Partial<TestScenario>): Promise<TestScenario> {
+    const [scenario] = await db
+      .update(testScenarios)
+      .set(updates)
+      .where(eq(testScenarios.id, id))
+      .returning();
+    if (!scenario) {
+      throw new Error("Test scenario not found");
+    }
+    return scenario;
+  }
+
+  // Bot Executions
+  async createBotExecution(insertExecution: InsertBotExecution): Promise<BotExecution> {
+    const [execution] = await db
+      .insert(botExecutions)
+      .values(insertExecution)
+      .returning();
+    return execution;
+  }
+
+  async getBotExecutionsByProject(projectId: number): Promise<BotExecution[]> {
+    return await db.select().from(botExecutions).where(eq(botExecutions.projectId, projectId));
+  }
+
+  async updateBotExecution(id: number, updates: Partial<BotExecution>): Promise<BotExecution> {
+    const [execution] = await db
+      .update(botExecutions)
+      .set(updates)
+      .where(eq(botExecutions.id, id))
+      .returning();
+    if (!execution) {
+      throw new Error("Bot execution not found");
+    }
+    return execution;
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -235,4 +362,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

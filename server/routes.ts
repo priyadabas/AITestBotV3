@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { openaiService } from "./services/openai";
+import { geminiService } from "./services/gemini";
 import { fileProcessor } from "./services/fileProcessor";
 import { insertProjectSchema, insertUploadSchema, insertAnalysisResultSchema, insertTestScenarioSchema } from "@shared/schema";
 
@@ -82,14 +82,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Perform AI analysis in background
       setTimeout(async () => {
         try {
-          const analysis = await openaiService.analyzePRD(processedFile.content);
+          const analysis = await geminiService.analyzePRD(processedFile.content);
           await storage.updateAnalysisResult(analysisResult.id, {
             status: "completed",
             progress: 100,
             results: analysis,
           });
         } catch (error) {
-          console.log("OpenAI API error:", (error as Error).message);
+          console.log("Gemini API error:", (error as Error).message);
           await storage.updateAnalysisResult(analysisResult.id, {
             status: "failed",
             progress: 0,
@@ -138,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Perform AI analysis in background
       setTimeout(async () => {
         try {
-          const analysis = await openaiService.analyzeDesign(processedFile.content);
+          const analysis = await geminiService.analyzeDesign(processedFile.content);
           await storage.updateAnalysisResult(analysisResult.id, {
             status: "completed",
             progress: 100,
@@ -193,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Perform AI analysis in background
       setTimeout(async () => {
         try {
-          const analysis = await openaiService.analyzeCode(processedFile.content);
+          const analysis = await geminiService.analyzeCode(processedFile.content);
           await storage.updateAnalysisResult(analysisResult.id, {
             status: "completed",
             progress: 100,
@@ -238,14 +238,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "PRD analysis not completed" });
       }
 
-      const scenarios = await openaiService.generateTestScenarios(
+      const scenarios = await geminiService.generateTestScenarios(
         prdAnalysis.results as any,
         designAnalysis?.results as any || {},
         codeAnalysis?.results as any || {}
       );
 
       const createdScenarios = await Promise.all(
-        scenarios.map(scenario =>
+        scenarios.map((scenario: any) =>
           storage.createTestScenario({
             projectId,
             ...scenario,
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Generate AI insights
-      const insights = await openaiService.generateInsights(
+      const insights = await geminiService.generateInsights(
         prdAnalysis.results as any,
         designAnalysis?.results as any || {},
         codeAnalysis?.results as any || {}

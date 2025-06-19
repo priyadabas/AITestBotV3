@@ -103,3 +103,46 @@ export type InsertTestScenario = z.infer<typeof insertTestScenarioSchema>;
 
 export type BotExecution = typeof botExecutions.$inferSelect;
 export type InsertBotExecution = z.infer<typeof insertBotExecutionSchema>;
+
+// Relations
+import { relations } from "drizzle-orm";
+
+export const projectsRelations = relations(projects, ({ many }) => ({
+  uploads: many(uploads),
+  analysisResults: many(analysisResults),
+  testScenarios: many(testScenarios),
+  botExecutions: many(botExecutions),
+}));
+
+export const uploadsRelations = relations(uploads, ({ one }) => ({
+  project: one(projects, {
+    fields: [uploads.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const analysisResultsRelations = relations(analysisResults, ({ one }) => ({
+  project: one(projects, {
+    fields: [analysisResults.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const testScenariosRelations = relations(testScenarios, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [testScenarios.projectId],
+    references: [projects.id],
+  }),
+  botExecutions: many(botExecutions),
+}));
+
+export const botExecutionsRelations = relations(botExecutions, ({ one }) => ({
+  project: one(projects, {
+    fields: [botExecutions.projectId],
+    references: [projects.id],
+  }),
+  scenario: one(testScenarios, {
+    fields: [botExecutions.scenarioId],
+    references: [testScenarios.id],
+  }),
+}));
