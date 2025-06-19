@@ -1,18 +1,85 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import Header from "@/components/layout/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Plus } from "lucide-react";
 import { api, type TestScenario } from "@/lib/api";
+import { apiRequest } from "@/lib/queryClient";
+
+const testScenarioSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  priority: z.enum(["high", "medium", "low"]),
+  type: z.enum(["functional", "visual", "integration", "performance"]),
+  steps: z.string().min(1, "Test steps are required"),
+  expectedResults: z.string().min(1, "Expected results are required"),
+});
+
+type TestScenarioForm = z.infer<typeof testScenarioSchema>;
 
 interface TestCasesPageProps {
   projectId: number;
 }
 
 export default function TestCasesPage({ projectId }: TestCasesPageProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
   const { data: scenarios = [], isLoading } = useQuery({
     queryKey: [`/api/projects/${projectId}/scenarios`],
     queryFn: () => api.getTestScenarios(projectId),
+  });
+
+  const form = useForm<TestScenarioForm>({
+    resolver: zodResolver(testScenarioSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      priority: "medium",
+      type: "functional",
+      steps: "",
+      expectedResults: "",
+    },
+  });
+
+  const createScenarioMutation = useMutation({
+    mutationFn: async (data: TestScenarioForm) => {
+      const stepsArray = data.steps.split('\n').filter(step => step.trim());
+      const scenarioData = {
+        ...data,
+        steps: stepsArray,
+        status: "pending",
+      };
+      
+      const response = await fetch(`/api/projects/${projectId}/scenarios`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(scenarioData),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to create test scenario");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/scenarios`] });
+      setIsDialogOpen(false);
+      form.reset();
+    },
   });
 
   const getPriorityColor = (priority: string) => {
@@ -43,11 +110,20 @@ export default function TestCasesPage({ projectId }: TestCasesPageProps) {
     }
   };
 
+  const onSubmit = (data: TestScenarioForm) => {
+    createScenarioMutation.mutate(data);
+  };
+
   return (
     <>
       <Header
         title="Test Cases"
         description="AI-generated test scenarios based on your requirements"
+        action={{
+          label: "Add Test Case",
+          onClick: () => setIsDialogOpen(true),
+          icon: "plus",
+        }}
       />
 
       <main className="flex-1 p-6 overflow-auto">
@@ -134,6 +210,152 @@ export default function TestCasesPage({ projectId }: TestCasesPageProps) {
           </div>
         )}
       </main>
+
+      {/* Add Test Case Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Manual Test Case</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Test Case Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter test case title" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Test Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select test type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="functional">Functional</SelectItem>
+                        <SelectItem value="visual">Visual</SelectItem>
+                        <SelectItem value="integration">Integration</SelectItem>
+                        <SelectItem value="performance">Performance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe what this test case covers"
+                        className="min-h-[100px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="steps"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Test Steps</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter each test step on a new line:&#10;1. Navigate to login page&#10;2. Enter credentials&#10;3. Click login button"
+                        className="min-h-[120px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="expectedResults"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expected Results</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe the expected outcome"
+                        className="min-h-[100px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createScenarioMutation.isPending}
+                >
+                  {createScenarioMutation.isPending ? "Creating..." : "Create Test Case"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 interface HeaderProps {
   title: string;
@@ -6,7 +7,7 @@ interface HeaderProps {
   action?: {
     label: string;
     onClick: () => void;
-    icon?: string;
+    icon?: "plus";
     disabled?: boolean;
   };
 }
@@ -26,7 +27,7 @@ export default function Header({ title, description, action }: HeaderProps) {
               disabled={action.disabled}
               className="flex items-center space-x-2"
             >
-              {action.icon && <i className={action.icon}></i>}
+              {action.icon === "plus" && <Plus className="h-4 w-4" />}
               <span>{action.label}</span>
             </Button>
           </div>

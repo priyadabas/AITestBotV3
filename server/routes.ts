@@ -302,6 +302,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create manual test scenario
+  app.post("/api/projects/:projectId/scenarios", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const scenarioData = insertTestScenarioSchema.parse({
+        projectId,
+        ...req.body
+      });
+
+      const scenario = await storage.createTestScenario(scenarioData);
+      res.status(201).json(scenario);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid test scenario data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create test scenario" });
+    }
+  });
+
+  // Update test scenario
+  app.put("/api/projects/:projectId/scenarios/:scenarioId", async (req, res) => {
+    try {
+      const scenarioId = parseInt(req.params.scenarioId);
+      const updates = req.body;
+
+      const scenario = await storage.updateTestScenario(scenarioId, updates);
+      res.json(scenario);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update test scenario" });
+    }
+  });
+
   // AI insights
   app.get("/api/projects/:projectId/insights", async (req, res) => {
     try {
