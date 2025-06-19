@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File uploads
-  app.post("/api/projects/:projectId/uploads/prd", upload.single("file"), async (req, res) => {
+  app.post("/api/projects/:projectId/upload/prd", upload.single("file"), async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       if (!req.file) {
@@ -89,10 +89,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             results: analysis,
           });
         } catch (error) {
-          console.log("Gemini API error:", (error as Error).message);
+          console.error("Gemini API error:", error);
           await storage.updateAnalysisResult(analysisResult.id, {
             status: "failed",
             progress: 0,
+            results: { error: (error as Error).message }
           });
         }
       }, 1000);
@@ -224,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate test scenarios
+  // Generate basic test scenarios (PRD only)
   app.post("/api/projects/:projectId/generate-scenarios", async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -232,16 +233,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const prdAnalysis = analysisResults.find(r => r.type === "prd_analysis" && r.status === "completed");
       const designAnalysis = analysisResults.find(r => r.type === "design_analysis" && r.status === "completed");
-      const codeAnalysis = analysisResults.find(r => r.type === "code_analysis" && r.status === "completed");
 
       if (!prdAnalysis) {
-        return res.status(400).json({ message: "PRD analysis not completed" });
+        return res.status(400).json({ message: "PRD analysis is required for test case generation" });
       }
 
       const scenarios = await geminiService.generateTestScenarios(
         prdAnalysis.results as any,
         designAnalysis?.results as any || {},
-        codeAnalysis?.results as any || {}
+        {
+          architecture: "",
+          technologies: [],
+          endpoints: [],
+          components: [],
+          testCoverage: "",
+          codeQuality: ""
+        }
       );
 
       const createdScenarios = await Promise.all(
@@ -258,7 +265,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const insights = await geminiService.generateInsights(
         prdAnalysis.results as any,
         designAnalysis?.results as any || {},
-        codeAnalysis?.results as any || {}
+        {
+          architecture: "",
+          technologies: [],
+          endpoints: [],
+          components: [],
+          testCoverage: "",
+          codeQuality: ""
+        }
       );
 
       // Store insights in a general analysis result

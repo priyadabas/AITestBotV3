@@ -45,35 +45,55 @@ interface AIInsight {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   async analyzePRD(prdContent: string): Promise<PRDAnalysisResult> {
     try {
-      const prompt = `You are an expert product analyst. Analyze the provided PRD document and extract key information. Return your analysis as JSON with the following structure:
-      {
-        "requirements": ["requirement1", "requirement2"],
-        "userStories": ["story1", "story2"],
-        "acceptanceCriteria": ["criteria1", "criteria2"],
-        "functionalRequirements": ["func1", "func2"],
-        "nonFunctionalRequirements": ["nonfunc1", "nonfunc2"],
-        "riskAreas": ["risk1", "risk2"]
-      }
+      const prompt = `Analyze this PRD document and extract key information. Respond only with valid JSON in this exact format:
 
-      PRD Document to analyze:
-      ${prdContent}`;
+{
+  "requirements": ["requirement1", "requirement2"],
+  "userStories": ["story1", "story2"],
+  "acceptanceCriteria": ["criteria1", "criteria2"],
+  "functionalRequirements": ["func1", "func2"],
+  "nonFunctionalRequirements": ["nonfunc1", "nonfunc2"],
+  "riskAreas": ["risk1", "risk2"]
+}
+
+PRD Document:
+${prdContent}`;
 
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
-      // Extract JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid JSON found in response");
+      // Clean the response text and extract JSON
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Try to find JSON in the response
+      let jsonData;
+      try {
+        jsonData = JSON.parse(cleanText);
+      } catch {
+        // If direct parsing fails, try to extract JSON block
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error("No valid JSON found in Gemini response");
+        }
+        jsonData = JSON.parse(jsonMatch[0]);
       }
       
-      return JSON.parse(jsonMatch[0]);
+      // Validate the structure
+      const requiredFields = ['requirements', 'userStories', 'acceptanceCriteria', 'functionalRequirements', 'nonFunctionalRequirements', 'riskAreas'];
+      for (const field of requiredFields) {
+        if (!Array.isArray(jsonData[field])) {
+          jsonData[field] = [];
+        }
+      }
+      
+      return jsonData as PRDAnalysisResult;
     } catch (error) {
+      console.error("Gemini PRD analysis error:", error);
       throw new Error("Failed to analyze PRD: " + (error as Error).message);
     }
   }
