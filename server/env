@@ -1,0 +1,7 @@
+SESSION_SECRET=ZgHhwg3r9YMUKJQ2APlM+M6kXmVut8aCtLb0gS8QrPwaY0B0ATqpoyhOIVfzD2PoGUXSTY5TjZqBV8Vjj/m10A==
+DATABASE_URL=postgresql://neondb_owner:npg_by6SxOMgUW2u@ep-wispy-heart-a6qndaen.us-west-2.aws.neon.tech/neondb?sslmode=require
+PGDATABASE=neondb
+PGHOST=ep-wispy-heart-a6qndaen.us-west-2.aws.neon.tech
+PGPORT=5432
+PGUSER=neondb_owner
+PGPASSWORD=npg_by6SxOMgUW2u
