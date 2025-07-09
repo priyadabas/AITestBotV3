@@ -1,0 +1,137 @@
+JIT Experiment V0 - WMS
+Background
+
+Just-In-Time (JIT) is an experiment designed with a focus on placing orders to sellers on actual user order placement and storing no inventory in the WH. The focus is on differentiating between JIT and non-JIT stock-keeping units (SKUs) within warehouse processes. Key aspects include:
+
+1. Process Flow: The document presents a detailed process flow for both forward and reverse logistics within the warehouse. It highlights the requirements for identifying JIT vehicles and managing the goods receipt note (GRN) process for JIT items.
+
+2. User Journey and App Requirements: The document details the journey of warehouse executives through the process of managing JIT SKUs, including the use of a GRN app for accurate inventory tracking and a dropping app for chief level putaway.
+
+3. Data Management: It specifies the creation and management of tables containing seller ID, SKU ID, and JIT flags, as well as the importance of real-time updates in the backend database. There's also a focus on handling rejected quantities and RTV (Return to Vendor) processes.
+
+4. Challenges and Risks: The document identifies risks associated with the JIT process, such as inventory exposure, inefficiencies in the dropping method, potential errors due to changes in chief sequence order, and limitations of the AoDB (App Sheets on Database) system.
+
+5. Experimentation: The document is structured as an experiment to evaluate the viability of JIT operations within the existing WMS framework, with ongoing adjustments and feature implementations described as either in progress or planned.
+
+The document emphasizes the need for clear visibility of JIT operations, robust data management, and continuous monitoring of process efficiency and risk.
+
+V0 Process Flow Diagrams
+
+Forward Leg - WH
+Reverse Leg - WH
+Experiment Tech Requirements
+
+JIT WMS V0 Requirements - Forward Flow
+
+Process: Pre-Requisite 1
+New App Required: No
+User stories: As an experiment, clear visibility of JIT vs non-JIT SKUs must be visible to all users
+Features: Creation of table with details seller ID, SKU id and JIT flag
+Platform: Backend DB
+Acceptance Criteria: 
+1. Any change in this list by ops must be communicated and accordingly updated.
+2. Table should have visibility for multiple use cases [V0]:
+   • Same seller might sell some JIT and some non-JIT SKUs [V1]
+   • Same SKU might be JIT or non-JIT [V1]
+
+Process: Inwarding
+New App Required: No
+User stories: When JIT FML executive lands on the WH dock, security executive needs to be able to determine whether the given vehicle is JIT/Non-JIT. As a security executive, this can be done by completing any 2 of 3 checks:
+- WH landing time post 9 PM
+- Vehicle number list
+- Absence of physical invoice
+
+Features: Vehicle number for JIT will be shared with the WH on day 0 and updated everyday
+Platform: Excel Sheet
+Acceptance Criteria: For Ops team
+
+Process: GRN
+New App Required: Yes
+User stories: As an GRN executive, when doing GRN from JIT putaway area, I will use GRN app. In case any mixing happens between JIT and non-JIT SKUs, I should not be able to find the same SKU for GRN on Stockone.
+
+User Journey:
+1. GRN executive will open GRN app.
+2. GRN executive will login to the GRN app.
+3. GRN executive can choose to search any JIT sku from search bar
+
+Features: Create an app for GRN of JIT items containing the following information for each SKU:
+- UOM (Pre-filled)
+- Mfg date
+- MRP
+- Expected Qty (Pre-filled, equals to orders placed for that SKU and updated based on accepted qty)
+- Received Qty
+- Damaged Qty
+- PO number (pre-filled)
+- Pallet ID for SKU
+
+Platform: GRN App
+
+GRN Acceptance Criteria:
+1. Expiry date calculation based on Mfg date logic
+2. UOM should be exact match else GRN executive cannot proceed with GRN for that SKU. This has to be input to GRN issues.
+3. MRP mismatch should be rejected. This has to be input to GRN issues.
+4. Alien SKUs input in GRN issues with product description and LID as null. This should be escalated to KAMs and solved operationally.
+5. GRN Rejected SKUs to be sent to RTV.
+6. GRN issues can be re-GRN'd in case of issue resolution.
+7. Accepted Qty can't be greater than expected Qty.
+8. RTV qty will be calculated on GRN issues calculation for a particular seller.
+9. Excess Qty to be input in GRN Issues.
+10. Mark an item as alien SKU
+
+Calculate accepted qty field at BE:
+Rx qty - damaged qty = accepted qty
+
+Post partial GRN, the expected qty for the next partial GRN of the same SKU should be updated.
+
+Process: Dropping
+New App Required: Yes
+User stories: As a dropping executive, I will use dropping app for putaway of JIT items to chiefs. I need to be able to allocate JIT items to empty chiefs and mark them as JIT.
+
+Features: Create dropping app for JIT items with following functionality:
+- Scan pallet ID
+- Choose chief location
+- Mark chief as JIT
+- Update inventory in backend
+
+Platform: Dropping App
+
+Dropping Acceptance Criteria:
+1. Only empty chiefs can be allocated for JIT items
+2. JIT items cannot be mixed with non-JIT items in same chief
+3. System should track JIT vs non-JIT inventory separately
+4. Real-time inventory updates in backend database
+5. Chief location should be clearly marked as JIT
+6. Dropping executive should scan pallet ID before putaway
+7. System should validate pallet ID against GRN data
+8. Error handling for invalid pallet IDs
+9. Audit trail for all dropping activities
+10. Integration with WMS for inventory visibility
+
+Technical Requirements:
+- Real-time database updates
+- Barcode scanning capability
+- Integration with existing WMS
+- User authentication and authorization
+- Error logging and monitoring
+- Mobile-responsive design
+- Offline capability for network issues
+
+Risk Assessment:
+1. Inventory exposure due to JIT operations
+2. Inefficiencies in dropping method
+3. Potential errors due to changes in chief sequence order
+4. Limitations of AoDB system
+5. Data synchronization issues
+6. User adoption challenges
+7. System integration complexities
+8. Operational workflow disruptions
+
+Success Metrics:
+- Reduction in inventory holding costs
+- Improved order fulfillment speed
+- Reduced storage space requirements
+- Enhanced inventory accuracy
+- Better supplier relationship management
+- Improved customer satisfaction
+- Reduced operational costs
+- Increased system efficiency
