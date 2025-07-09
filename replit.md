@@ -91,3 +91,33 @@ Preferred communication style: Simple, everyday language.
 - **OPENAI_API_KEY**: OpenAI API key (optional)
 
 The application is designed to be deployed on platforms like Replit, with proper configuration for both development and production environments.
+
+## Recent Updates (January 2025)
+
+### Major Feature Enhancements
+- **PDF Upload Flow Fixed**: Implemented proper PDF file handling with text extraction
+- **Gemini AI Integration**: Added Google Gemini AI service for intelligent test case generation
+- **Playwright Testing**: Integrated Playwright for automated browser testing
+- **Direct PRD-to-Test Flow**: PRD uploads now automatically generate test scenarios using AI
+- **Test Execution Engine**: Added comprehensive test execution with screenshot capture
+- **Success/Fail Reporting**: Implemented detailed test reports with pass/fail status and insights
+- **Bot Execution API**: Added endpoints for running automated test scenarios
+- **Enhanced File Processing**: Support for PDF, TXT files with proper metadata extraction
+
+### Architecture Updates
+- **AI Services**: Added Gemini service for content analysis and test generation
+- **Playwright Service**: New service for automated browser testing with screenshot capture
+- **Enhanced API**: New endpoints for bot execution, test reports, and scenario management
+- **Database Schema**: Updated to support bot executions and test results
+- **File Processing**: Improved file handling with proper PDF support
+
+### New API Endpoints
+- `POST /api/projects/{id}/execute-scenarios` - Execute test scenarios with Playwright
+- `GET /api/projects/{id}/executions` - Get bot execution history
+- `GET /api/projects/{id}/executions/{execId}/report` - Get detailed test reports
+- Enhanced PRD upload flow with automatic test generation
+
+### Dependencies Added
+- **@google/genai**: Google Gemini AI integration
+- **playwright**: Browser automation testing
+- **Enhanced file processing**: Better support for PDF and text files

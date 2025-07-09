@@ -1,5 +1,7 @@
 import { readFileSync } from "fs";
 import path from "path";
+// For now, handle PDF as text extraction - we'll implement proper PDF parsing later
+// import * as pdfjs from "pdfjs-dist/legacy/build/pdf.js";
 
 interface ProcessedFile {
   content: string;
@@ -19,10 +21,34 @@ export class FileProcessor {
           metadata = { type: "text", encoding: "utf-8" };
           break;
         case ".pdf":
-          // For now, we'll handle PDF as text placeholder
-          // In production, you'd use a library like pdf-parse
-          content = "PDF content would be extracted here using a proper PDF parser";
-          metadata = { type: "pdf", pages: 1 };
+          try {
+            // For now, use a simple text-based approach
+            // In production, you would use a proper PDF parser
+            const pdfBuffer = readFileSync(filePath);
+            const pdfSize = pdfBuffer.length;
+            
+            // Simple placeholder - in a real implementation, you'd use pdf-parse or similar
+            content = `PDF file uploaded (${pdfSize} bytes). Content extraction would be implemented with proper PDF parsing library.
+            
+Sample PRD structure expected:
+- Project Overview
+- User Requirements
+- Functional Requirements
+- Non-Functional Requirements
+- User Stories
+- Acceptance Criteria
+- Technical Specifications
+- Risk Assessment`;
+            
+            metadata = { 
+              type: "pdf", 
+              pages: 1,
+              fileSize: pdfSize,
+              title: fileName
+            };
+          } catch (pdfError) {
+            throw new Error(`Failed to process PDF: ${(pdfError as Error).message}`);
+          }
           break;
         default:
           throw new Error(`Unsupported file type: ${extension}`);

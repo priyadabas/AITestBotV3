@@ -4,7 +4,8 @@ import multer from "multer";
 import { storage } from "./storage";
 import { geminiService } from "./services/gemini";
 import { fileProcessor } from "./services/fileProcessor";
-import { insertProjectSchema, insertUploadSchema, insertAnalysisResultSchema, insertTestScenarioSchema } from "@shared/schema";
+import { playwrightService } from "./services/playwrightService";
+import { insertProjectSchema, insertUploadSchema, insertAnalysisResultSchema, insertTestScenarioSchema, insertBotExecutionSchema } from "@shared/schema";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -88,6 +89,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             progress: 100,
             results: analysis,
           });
+
+          // Generate test scenarios directly from PRD
+          const scenarios = await geminiService.generateTestScenariosFromPRD(processedFile.content);
+          await Promise.all(
+            scenarios.map((scenario: any) =>
+              storage.createTestScenario({
+                projectId,
+                ...scenario,
+                actualResults: null,
+              })
+            )
+          );
         } catch (error) {
           console.error("Gemini API error:", error);
           await storage.updateAnalysisResult(analysisResult.id, {
@@ -500,6 +513,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Bot execution endpoints
+  app.post("/api/projects/:projectId/execute-scenarios", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { scenarioIds, baseUrl } = req.body;
+
+      // Get scenarios to execute
+      const allScenarios = await storage.getTestScenariosByProject(projectId);
+      const scenariosToExecute = scenarioIds 
+        ? allScenarios.filter(s => scenarioIds.includes(s.id))
+        : allScenarios;
+
+      if (scenariosToExecute.length === 0) {
+        return res.status(400).json({ message: "No scenarios found to execute" });
+      }
+
+      // Create bot execution record
+      const botExecution = await storage.createBotExecution({
+        projectId,
+        status: "in_progress",
+        progress: 0,
+        results: null,
+        report: null,
+        executedScenarios: scenariosToExecute.length,
+        passedScenarios: 0,
+        failedScenarios: 0,
+      });
+
+      // Execute scenarios in background
+      setTimeout(async () => {
+        try {
+          await playwrightService.initialize();
+          
+          const executionResults = await playwrightService.executeMultipleScenarios(
+            scenariosToExecute, 
+            baseUrl || "http://localhost:3000"
+          );
+
+          // Update test scenarios with results
+          await Promise.all(
+            executionResults.map(async (result) => {
+              await storage.updateTestScenario(result.scenarioId, {
+                status: result.status,
+                actualResults: result.actualResults || result.error,
+              });
+            })
+          );
+
+          // Generate test report
+          const report = await playwrightService.generateTestReport(executionResults);
+          
+          const passedCount = executionResults.filter(r => r.status === 'passed').length;
+          const failedCount = executionResults.filter(r => r.status === 'failed').length;
+
+          // Update bot execution record
+          await storage.updateBotExecution(botExecution.id, {
+            status: "completed",
+            progress: 100,
+            results: executionResults,
+            report,
+            passedScenarios: passedCount,
+            failedScenarios: failedCount,
+          });
+
+          await playwrightService.cleanup();
+        } catch (error) {
+          console.error("Test execution error:", error);
+          await storage.updateBotExecution(botExecution.id, {
+            status: "failed",
+            progress: 0,
+            results: { error: (error as Error).message },
+            report: `Test execution failed: ${(error as Error).message}`,
+          });
+          await playwrightService.cleanup();
+        }
+      }, 1000);
+
+      res.status(201).json(botExecution);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to start test execution" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/executions", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const executions = await storage.getBotExecutionsByProject(projectId);
+      res.json(executions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch bot executions" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/executions/:executionId", async (req, res) => {
+    try {
+      const executionId = parseInt(req.params.executionId);
+      const executions = await storage.getBotExecutionsByProject(parseInt(req.params.projectId));
+      const execution = executions.find(e => e.id === executionId);
+      
+      if (!execution) {
+        return res.status(404).json({ message: "Execution not found" });
+      }
+      
+      res.json(execution);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch execution details" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/executions/:executionId/report", async (req, res) => {
+    try {
+      const executionId = parseInt(req.params.executionId);
+      const executions = await storage.getBotExecutionsByProject(parseInt(req.params.projectId));
+      const execution = executions.find(e => e.id === executionId);
+      
+      if (!execution) {
+        return res.status(404).json({ message: "Execution not found" });
+      }
+      
+      res.setHeader('Content-Type', 'text/markdown');
+      res.send(execution.report || "No report available");
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch execution report" });
+    }
+  });
+
+  const server = createServer(app);
+  return server;
 }

@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 interface PRDAnalysisResult {
   requirements: string[];
@@ -45,8 +45,7 @@ interface AIInsight {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+  
   async analyzePRD(prdContent: string): Promise<PRDAnalysisResult> {
     try {
       const prompt = `Analyze this PRD document and extract key information. Respond only with valid JSON in this exact format:
@@ -63,9 +62,12 @@ export class GeminiService {
 PRD Document:
 ${prdContent}`;
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const text = result.text || "";
       
       // Clean the response text and extract JSON
       const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -112,9 +114,12 @@ ${prdContent}`;
       Design information to analyze:
       ${designDescription}`;
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const text = result.text || "";
       
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -142,9 +147,12 @@ ${prdContent}`;
       Code to analyze:
       ${codeContent}`;
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const text = result.text || "";
       
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -163,37 +171,76 @@ ${prdContent}`;
     codeAnalysis: CodeAnalysisResult
   ): Promise<TestScenarioData[]> {
     try {
-      const prompt = `You are a QA expert specializing in UAT testing. Based on the provided analysis data, generate comprehensive test scenarios. Return an array of test scenarios in JSON format:
-      {
-        "scenarios": [
-          {
-            "title": "Test Title",
-            "description": "Detailed description",
-            "priority": "high|medium|low",
-            "type": "functional|visual|integration|performance",
-            "steps": ["step1", "step2"],
-            "expectedResults": "Expected outcome"
-          }
-        ]
-      }
+      const prompt = `Based on the PRD, design, and code analysis, generate comprehensive test scenarios that can be automated with Playwright. Each scenario should include specific, actionable steps that can be executed programmatically.
 
-      Analysis data:
-      PRD Analysis: ${JSON.stringify(prdAnalysis)}
-      Design Analysis: ${JSON.stringify(designAnalysis)}
-      Code Analysis: ${JSON.stringify(codeAnalysis)}`;
+PRD Analysis:
+${JSON.stringify(prdAnalysis, null, 2)}
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+Design Analysis:
+${JSON.stringify(designAnalysis, null, 2)}
+
+Code Analysis:
+${JSON.stringify(codeAnalysis, null, 2)}
+
+Generate test scenarios in this exact JSON format:
+[
+  {
+    "title": "Test scenario title",
+    "description": "Detailed description of what this test validates",
+    "priority": "high",
+    "type": "functional",
+    "steps": [
+      "Navigate to the home page",
+      "Click on 'Login' button",
+      "Enter username 'testuser' in the username field",
+      "Enter password 'testpass' in the password field",
+      "Click 'Submit' button",
+      "Verify 'Welcome' message appears"
+    ],
+    "expectedResults": "User should be successfully logged in and see welcome message"
+  }
+]
+
+Focus on:
+- Functional user workflows
+- Critical user journeys
+- Error handling scenarios
+- UI component interactions
+- Form submissions and validations
+- Navigation flows
+
+Make sure each step is specific enough for automated testing with Playwright.`;
+
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
       
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid JSON found in response");
+      const text = result.text || "";
+      
+      // Clean the response text and extract JSON
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      let jsonData;
+      try {
+        jsonData = JSON.parse(cleanText);
+      } catch {
+        // If direct parsing fails, try to extract JSON array
+        const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          throw new Error("No valid JSON array found in response");
+        }
+        jsonData = JSON.parse(jsonMatch[0]);
       }
       
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.scenarios || [];
+      // Validate array structure
+      if (!Array.isArray(jsonData)) {
+        throw new Error("Response is not an array");
+      }
+      
+      return jsonData as TestScenarioData[];
     } catch (error) {
+      console.error("Gemini test scenario generation error:", error);
       throw new Error("Failed to generate test scenarios: " + (error as Error).message);
     }
   }
@@ -204,36 +251,136 @@ ${prdContent}`;
     codeAnalysis: CodeAnalysisResult
   ): Promise<AIInsight[]> {
     try {
-      const prompt = `You are a senior product consultant. Analyze the provided data and generate actionable insights. Return JSON with this structure:
-      {
-        "insights": [
-          {
-            "type": "info|warning|error|success",
-            "title": "Insight Title",
-            "description": "Detailed description",
-            "severity": "high|medium|low"
-          }
-        ]
-      }
+      const prompt = `Analyze the PRD, design, and code analysis results to generate actionable insights for improving the testing strategy and identifying potential issues.
 
-      Analysis data:
-      PRD Analysis: ${JSON.stringify(prdAnalysis)}
-      Design Analysis: ${JSON.stringify(designAnalysis)}
-      Code Analysis: ${JSON.stringify(codeAnalysis)}`;
+PRD Analysis:
+${JSON.stringify(prdAnalysis, null, 2)}
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+Design Analysis:
+${JSON.stringify(designAnalysis, null, 2)}
+
+Code Analysis:
+${JSON.stringify(codeAnalysis, null, 2)}
+
+Generate insights in this exact JSON format:
+[
+  {
+    "type": "warning",
+    "title": "Insight title",
+    "description": "Detailed description of the insight",
+    "severity": "high"
+  }
+]
+
+Focus on:
+- Potential testing gaps
+- Risk areas that need attention
+- Quality concerns
+- User experience issues
+- Technical debt
+- Security considerations`;
+
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
       
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid JSON found in response");
+      const text = result.text || "";
+      
+      // Clean the response text and extract JSON
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      let jsonData;
+      try {
+        jsonData = JSON.parse(cleanText);
+      } catch {
+        // If direct parsing fails, try to extract JSON array
+        const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          throw new Error("No valid JSON array found in response");
+        }
+        jsonData = JSON.parse(jsonMatch[0]);
       }
       
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.insights || [];
+      // Validate array structure
+      if (!Array.isArray(jsonData)) {
+        throw new Error("Response is not an array");
+      }
+      
+      return jsonData as AIInsight[];
     } catch (error) {
+      console.error("Gemini insights generation error:", error);
       throw new Error("Failed to generate insights: " + (error as Error).message);
+    }
+  }
+
+  async generateTestScenariosFromPRD(prdContent: string): Promise<TestScenarioData[]> {
+    try {
+      const prompt = `Analyze this PRD document and generate comprehensive test scenarios that can be automated with Playwright. Focus on core user workflows and critical functionality.
+
+PRD Document:
+${prdContent}
+
+Generate test scenarios in this exact JSON format:
+[
+  {
+    "title": "Test scenario title",
+    "description": "Detailed description of what this test validates",
+    "priority": "high",
+    "type": "functional",
+    "steps": [
+      "Navigate to the home page",
+      "Click on 'Login' button",
+      "Enter username 'testuser' in the username field",
+      "Enter password 'testpass' in the password field",
+      "Click 'Submit' button",
+      "Verify 'Welcome' message appears"
+    ],
+    "expectedResults": "User should be successfully logged in and see welcome message"
+  }
+]
+
+Focus on:
+- Core user workflows from the PRD
+- Critical business functionality
+- User authentication flows
+- Data input and validation
+- Navigation and user journeys
+- Error handling scenarios
+
+Make sure each step is specific enough for automated testing with Playwright.`;
+
+      const result = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      
+      const text = result.text || "";
+      
+      // Clean the response text and extract JSON
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      let jsonData;
+      try {
+        jsonData = JSON.parse(cleanText);
+      } catch {
+        // If direct parsing fails, try to extract JSON array
+        const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          throw new Error("No valid JSON array found in response");
+        }
+        jsonData = JSON.parse(jsonMatch[0]);
+      }
+      
+      // Validate array structure
+      if (!Array.isArray(jsonData)) {
+        throw new Error("Response is not an array");
+      }
+      
+      return jsonData as TestScenarioData[];
+    } catch (error) {
+      console.error("Gemini test scenario generation error:", error);
+      throw new Error("Failed to generate test scenarios from PRD: " + (error as Error).message);
     }
   }
 }

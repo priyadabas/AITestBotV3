@@ -112,4 +112,28 @@ export const api = {
     const response = await apiRequest("GET", `/api/projects/${projectId}/insights`);
     return response.json();
   },
+
+  // Bot execution
+  async executeBotScenarios(projectId: number, scenarioIds?: number[], baseUrl?: string): Promise<any> {
+    const response = await apiRequest("POST", `/api/projects/${projectId}/execute-scenarios`, { 
+      scenarioIds, 
+      baseUrl 
+    });
+    return response.json();
+  },
+
+  async getBotExecutions(projectId: number): Promise<any[]> {
+    const response = await apiRequest("GET", `/api/projects/${projectId}/executions`);
+    return response.json();
+  },
+
+  async getBotExecution(projectId: number, executionId: number): Promise<any> {
+    const response = await apiRequest("GET", `/api/projects/${projectId}/executions/${executionId}`);
+    return response.json();
+  },
+
+  async getBotExecutionReport(projectId: number, executionId: number): Promise<string> {
+    const response = await apiRequest("GET", `/api/projects/${projectId}/executions/${executionId}/report`);
+    return response.text();
+  },
 };
