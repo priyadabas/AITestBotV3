@@ -15,10 +15,6 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { API_BASE_URL } from './config';
 
-fetch('${API_BASE_URL}/api/hello')
-  .then(res => res.json())
-  .then(data => console.log(data));
-
 function Router() {
   const [currentProjectId, setCurrentProjectId] = useState<number>(1);
 
