@@ -63,6 +63,21 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+        <div className="min-h-screen bg-slate-50">
+          <div className="flex items-center justify-center p-8">
+            <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fas fa-robot text-white text-2xl"></i>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">UAT Testing AI Bot</h1>
+              <p className="text-gray-600 mb-6">AI-powered testing for your product development</p>
+              <div className="text-sm text-gray-500">
+                <p>Application is loading...</p>
+                <p>Frontend connected successfully!</p>
+              </div>
+            </div>
+          </div>
+        </div>
         <Router />
       </TooltipProvider>
     </QueryClientProvider>
