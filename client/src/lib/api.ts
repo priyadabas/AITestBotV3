@@ -67,7 +67,7 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
     
-    const response = await fetch(`http://localhost:5000/api/projects/${projectId}/upload/prd`, {
+    const response = await fetch(`/api/projects/${projectId}/upload/prd`, {
       method: "POST",
       body: formData,
       credentials: "include",

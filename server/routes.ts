@@ -22,7 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projects = await storage.getAllProjects();
       res.json(projects);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch projects" });
+      res.status(500).json({ message: "Failed to fetch projects" + error });
     }
   });
 
@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(project);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch project" });
+      res.status(500).json({ message: "Failed to fetch project" + error });
     }
   });
 

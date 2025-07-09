@@ -13,7 +13,7 @@ import Sidebar from "@/components/layout/sidebar";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { API_BASE_URL } from './config';
+
 
 function Router() {
   const [currentProjectId, setCurrentProjectId] = useState<number>(1);

@@ -119,7 +119,7 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
     fields: [uploads.projectId],
     references: [projects.id],
   }),
-}));
+})); 
 
 export const analysisResultsRelations = relations(analysisResults, ({ one }) => ({
   project: one(projects, {
