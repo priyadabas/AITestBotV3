@@ -1,7 +1,13 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
+// ============================
+// Tables
+// ============================
+
+// Projects
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -10,6 +16,7 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Uploads (PRD, Figma, Code)
 export const uploads = pgTable("uploads", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id).notNull(),
@@ -21,17 +28,21 @@ export const uploads = pgTable("uploads", {
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
+// AI Analysis Results
 export const analysisResults = pgTable("analysis_results", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id).notNull(),
-  type: text("type").notNull(), // 'prd_analysis', 'design_analysis', 'code_analysis'
+  type: text("type").notNull(), // 'prd_analysis', 'design_analysis', 'code_analysis', 'ai_insights'
   status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed', 'failed'
   progress: integer("progress").default(0), // 0-100
-  results: jsonb("results"), // Store AI analysis results
-  insights: jsonb("insights"), // Store AI insights and recommendations
+  results: jsonb("results").default(null),
+  insights: jsonb("insights").default(null),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });
+
+// Test Scenarios
+export type ScenarioStatus = "pending" | "running" | "passed" | "failed" | "skipped";
 
 export const testScenarios = pgTable("test_scenarios", {
   id: serial("id").primaryKey(),
@@ -43,23 +54,31 @@ export const testScenarios = pgTable("test_scenarios", {
   steps: jsonb("steps"), // Array of test steps
   expectedResults: text("expected_results"),
   actualResults: text("actual_results"),
-  status: text("status").default("pending"), // 'pending', 'running', 'passed', 'failed'
+  status: text("status").$type<ScenarioStatus>().default("pending"),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
 });
 
+// Bot Executions (Project-level batch runs)
 export const botExecutions = pgTable("bot_executions", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id).notNull(),
-  scenarioId: integer("scenario_id").references(() => testScenarios.id).notNull(),
   status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+  progress: integer("progress").default(0).notNull(),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   results: jsonb("results"), // Detailed execution results
   screenshots: jsonb("screenshots"), // Array of screenshot URLs
   logs: text("logs"),
+  report: text("report"), // Markdown execution report
+  executedScenarios: integer("executed_scenarios").default(0).notNull(),
+  passedScenarios: integer("passed_scenarios").default(0).notNull(),
+  failedScenarios: integer("failed_scenarios").default(0).notNull(),
 });
 
-// Insert schemas
+// ============================
+// Insert Schemas
+// ============================
+
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   createdAt: true,
@@ -88,7 +107,10 @@ export const insertBotExecutionSchema = createInsertSchema(botExecutions).omit({
   completedAt: true,
 });
 
+// ============================
 // Types
+// ============================
+
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 
@@ -104,8 +126,9 @@ export type InsertTestScenario = z.infer<typeof insertTestScenarioSchema>;
 export type BotExecution = typeof botExecutions.$inferSelect;
 export type InsertBotExecution = z.infer<typeof insertBotExecutionSchema>;
 
+// ============================
 // Relations
-import { relations } from "drizzle-orm";
+// ============================
 
 export const projectsRelations = relations(projects, ({ many }) => ({
   uploads: many(uploads),
@@ -119,7 +142,7 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
     fields: [uploads.projectId],
     references: [projects.id],
   }),
-})); 
+}));
 
 export const analysisResultsRelations = relations(analysisResults, ({ one }) => ({
   project: one(projects, {
@@ -140,9 +163,5 @@ export const botExecutionsRelations = relations(botExecutions, ({ one }) => ({
   project: one(projects, {
     fields: [botExecutions.projectId],
     references: [projects.id],
-  }),
-  scenario: one(testScenarios, {
-    fields: [botExecutions.scenarioId],
-    references: [testScenarios.id],
   }),
 }));

@@ -1,16 +1,16 @@
 import { chromium, type Page, type Browser } from 'playwright';
-import type { TestScenario } from '@shared/schema';
+import type { TestScenario, ScenarioStatus } from '@shared/schema';
 
 export interface TestExecutionResult {
   scenarioId: number;
-  status: 'passed' | 'failed' | 'skipped';
+  status: ScenarioStatus;
   duration: number;
   screenshots: string[];
   error?: string;
   actualResults?: string;
   steps: {
     step: string;
-    status: 'passed' | 'failed' | 'skipped';
+    status: ScenarioStatus;
     screenshot?: string;
     error?: string;
   }[];
@@ -61,15 +61,20 @@ export class PlaywrightService {
 
       // Execute each step
       if (scenario.steps) {
-        for (let i = 0; i < scenario.steps.length; i++) {
-          const step = scenario.steps[i];
-          const stepResult = {
+        const steps = scenario.steps as string[];   // ✅ cast JSONB to string[]
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          const stepResult: {
+            step: string;
+            status: 'passed' | 'failed' | 'skipped';
+            screenshot?: string;
+            error?: string;
+          } = {
             step,
-            status: 'passed' as const,
-            screenshot: undefined as string | undefined,
-            error: undefined as string | undefined
+            status: 'passed',
           };
-
+          
+      
           try {
             await this.executeStep(step, this.page);
             
@@ -249,10 +254,12 @@ export class PlaywrightService {
     await page.screenshot({ path: `uploads/${finalScreenshot}` });
     
     // Get page title and visible text
+    // Get page title and visible text
     const title = await page.title();
-    const visibleText = await page.textContent('body');
+    const visibleText = (await page.textContent('body')) ?? "";  // ensure it's always a string
+
     
-    return `Page title: ${title}\nVisible content length: ${visibleText?.length || 0} characters\nExpected: ${expectedResults}`;
+    return `Page title: ${title}\nVisible content length: ${visibleText.length} characters\nExpected: ${expectedResults}`;
   }
 
   async executeMultipleScenarios(scenarios: TestScenario[], baseUrl?: string): Promise<TestExecutionResult[]> {
